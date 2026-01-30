@@ -60,6 +60,12 @@ NUM_CALIBRATION_POINTS = 8
 # For a marker on the gripper, prefer placing it at the EE; this is a coarse approximation.
 MARKER_OFFSET_IN_ROBOT_FRAME = np.array([0.0, 0.0, 0.0])
 
+# --- ArUco Calibration (for camera behind robot, not seeing EE) ---
+ARUCO_MARKER_SIZE = 0.201  # meters (201mm = 20.1cm, measured from printed marker)
+ARUCO_DICT_TYPE = 0  # cv2.aruco.DICT_4X4_50 = 0
+MARKER_POSITIONS_FILE = "examples/ball_tracking/marker_positions.yaml"
+ARUCO_CALIBRATION_FILE_PATH = "examples/ball_tracking/camera_to_world.json"
+
 # --- MuJoCo Simulation ---
 SIM_XML_PATH = "./examples/ball_tracking/scene_ball.xml"
 SIM_BALL_INITIAL_POS = np.array([0.5, 0.0, 0.3])  # meters

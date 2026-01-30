@@ -1,0 +1,66 @@
+# ArUco marker positions in world frame (robot base frame)
+#
+# YOUR SETUP:
+#   - Camera: 10cm behind robot (-X), 30cm above base (+Z)
+#   - Robot at origin (0, 0, 0)
+#   - Looking at table in front
+#
+# World frame convention (adjust if yours differs):
+#   Origin: Robot base center
+#   X: forward (toward table/opponent)
+#   Y: left (from robot's perspective)
+#   Z: up
+#
+# IMPORTANT: Measure these positions with a tape measure!
+# Accuracy here directly affects calibration quality.
+
+markers:
+  # Markers on table surface (z = table height)
+  # Adjust x, y based on YOUR measurements from robot base
+
+  0:  # Front-left corner of your workspace
+    x: 0.30   # 30cm in front of robot
+    y: 0.20   # 20cm to the left
+    z: 0.76   # table height (standard 76cm, measure yours!)
+    rx: 0     # flat on table, facing up
+    ry: 0
+    rz: 0
+
+  1:  # Front-right corner
+    x: 0.30
+    y: -0.20  # 20cm to the right
+    z: 0.76
+    rx: 0
+    ry: 0
+    rz: 0
+
+  2:  # Back-left (further from robot)
+    x: 0.70   # 70cm in front
+    y: 0.20
+    z: 0.76
+    rx: 0
+    ry: 0
+    rz: 0
+
+  3:  # Back-right
+    x: 0.70
+    y: -0.20
+    z: 0.76
+    rx: 0
+    ry: 0
+    rz: 0
+
+# ============================================================
+# HOW TO MEASURE:
+# ============================================================
+# 1. Mark the robot base center on the table/floor
+# 2. For each marker, measure:
+#    - X: forward distance from robot base
+#    - Y: left/right distance (+ = left, - = right)
+#    - Z: height from ground (usually table height)
+# 3. Place marker CENTER at the measured position
+# 4. Update values above
+#
+# TIP: Use masking tape to mark exact positions, then place
+# markers there during calibration. Remove after calibration.
+# ============================================================
