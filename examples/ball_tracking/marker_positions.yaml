@@ -1,66 +1,65 @@
-# ArUco marker positions in world frame (robot base frame)
+# =============================================================================
+# MARKER POSITIONS — frame used in code (aruco_calibration.py, check_calibration.py)
+# =============================================================================
 #
-# YOUR SETUP:
-#   - Camera: 10cm behind robot (-X), 30cm above base (+Z)
-#   - Robot at origin (0, 0, 0)
-#   - Looking at table in front
+# Frame name in code: "world frame" = "robot base frame". Same frame everywhere.
 #
-# World frame convention (adjust if yours differs):
-#   Origin: Robot base center
-#   X: forward (toward table/opponent)
-#   Y: left (from robot's perspective)
-#   Z: up
+# Origin:
+#   (0, 0, 0) = center of the robot base (on the table or floor).
 #
-# IMPORTANT: Measure these positions with a tape measure!
-# Accuracy here directly affects calibration quality.
+# Axes (right-handed, in meters):
+#   X  = forward   (direction from robot base toward the table / scene).
+#   Y  = left      (positive = robot's left,  negative = robot's right).
+#   Z  = up        (height above the same reference as the robot base).
+#
+# Camera behind robot, robot facing the scene:
+#   LEFT side of the IMAGE  = robot's RIGHT  →  negative Y in this frame.
+#   RIGHT side of the IMAGE = robot's LEFT   →  positive Y in this frame.
+#
+# So a point (x, y, z) means:
+#   x meters forward from robot base,
+#   y meters to the left (if y > 0) or to the right (if y < 0),
+#   z meters up (same table as robot → z = 0).
+#
+# In code:
+#   - aruco_calibration.py loads this file and builds T_world_to_marker with
+#     translation [x, y, z] (and rotation from rx, ry, rz in degrees).
+#   - calibration.py / ball_to_robot use "robot frame" = this same frame.
+#   - controller.py IK uses (x, y, z) in this frame; r = sqrt(x^2 + y^2).
+#
+# CRITICAL: (x,y,z) here must be EXACTLY where the markers were when you ran
+#   python aruco_calibration.py
+# If you change this file, re-run aruco_calibration.py and save again.
+# =============================================================================
 
+# ID0, ID1 = in line with robot (10 cm forward). ID2, ID3 = 60 cm forward (further on table).
+# Image left = robot right (Y negative). Image right = robot left (Y positive).
 markers:
-  # Markers on table surface (z = table height)
-  # Adjust x, y based on YOUR measurements from robot base
-
-  0:  # Front-left corner of your workspace
-    x: 0.30   # 30cm in front of robot
-    y: 0.20   # 20cm to the left
-    z: 0.76   # table height (standard 76cm, measure yours!)
-    rx: 0     # flat on table, facing up
-    ry: 0
-    rz: 0
-
-  1:  # Front-right corner
-    x: 0.30
-    y: -0.20  # 20cm to the right
-    z: 0.76
+  0:   # 10 cm forward, image LEFT (= robot right) → y negative
+    x: 0.10
+    y: -0.36
+    z: 0.0
     rx: 0
     ry: 0
     rz: 0
-
-  2:  # Back-left (further from robot)
-    x: 0.70   # 70cm in front
-    y: 0.20
-    z: 0.76
+  1:   # 10 cm forward, image RIGHT (= robot left) → y positive
+    x: 0.10
+    y: 0.36
+    z: 0.0
     rx: 0
     ry: 0
     rz: 0
-
-  3:  # Back-right
-    x: 0.70
-    y: -0.20
-    z: 0.76
+  2:   # 60 cm forward, image LEFT (= robot right) → y negative
+    x: 0.60
+    y: -0.44
+    z: 0.0
     rx: 0
     ry: 0
     rz: 0
-
-# ============================================================
-# HOW TO MEASURE:
-# ============================================================
-# 1. Mark the robot base center on the table/floor
-# 2. For each marker, measure:
-#    - X: forward distance from robot base
-#    - Y: left/right distance (+ = left, - = right)
-#    - Z: height from ground (usually table height)
-# 3. Place marker CENTER at the measured position
-# 4. Update values above
-#
-# TIP: Use masking tape to mark exact positions, then place
-# markers there during calibration. Remove after calibration.
-# ============================================================
+  3:   # 60 cm forward, image RIGHT (= robot left) → y positive
+    x: 0.60
+    y: 0.36
+    z: 0.0
+    rx: 0
+    ry: 0
+    rz: 0

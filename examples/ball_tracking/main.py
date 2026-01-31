@@ -27,6 +27,7 @@ from config import (
     CONTROL_RATE_HZ, DETECTION_FRAMES_THRESHOLD, BALL_LOST_TIMEOUT,
     CALIBRATION_FILE_PATH,
     ARUCO_CALIBRATION_FILE_PATH,
+    WORKSPACE_R_MIN, WORKSPACE_R_MAX, WORKSPACE_Z_MIN, WORKSPACE_Z_MAX,
 )
 from camera import RealSenseCamera
 from detector import BallDetector
@@ -245,7 +246,15 @@ def main():
                     if shared.ball_pos_3d is not None:
                         shared.locked_position = shared.ball_pos_3d.copy()
                         shared.state = "LOCKED"
-                        print(f"[LOCKED] Ball position locked at {shared.locked_position}")
+                        x, y, z = shared.locked_position
+                        r = np.sqrt(x**2 + y**2)
+                        z_clip = np.clip(z, 0.08, 0.25)  # same as controller
+                        in_r = WORKSPACE_R_MIN <= r <= WORKSPACE_R_MAX
+                        in_z = WORKSPACE_Z_MIN <= z <= WORKSPACE_Z_MAX
+                        print(f"[LOCKED] Ball (robot frame): x={x:.3f} y={y:.3f} z={z:.3f} m")
+                        print(f"         r={r:.3f} m (IK uses z_clipped={z_clip:.3f})")
+                        print(f"         Workspace: r=[{WORKSPACE_R_MIN}, {WORKSPACE_R_MAX}], z=[{WORKSPACE_Z_MIN}, {WORKSPACE_Z_MAX}]")
+                        print(f"         In workspace: r={in_r}, z={in_z}  {'-> IK may fail if outside' if not (in_r and in_z) else ''}")
                     else:
                         print("[LOCKED] No ball detected to lock")
             elif key == ord('r'):  # Reset - unlock and return to ready

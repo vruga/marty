@@ -34,6 +34,7 @@ WORKSPACE_Z_MAX = 0.22  # meters
 # --- Robot Control ---
 CONTROL_RATE_HZ = 50
 ROBOT_PORT = "/dev/ttyACM0"
+# Robot joint calibration (from lerobot-joycon); file lives in examples/, resolved in controller
 CALIBRATION_FILE = "examples/main_follower.json"
 ROBOT_TYPE = "so100"  # must match your arm: "so100" or "so101" (affects FK in calibration)
 

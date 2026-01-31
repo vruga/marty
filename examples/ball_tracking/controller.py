@@ -1,12 +1,26 @@
 """Robot control: IK wrapper, motion smoothing, ready position, safety limits."""
 
 import numpy as np
+from pathlib import Path
 from config import (
     READY_QPOS, CONTROL_QLIMIT, MAX_JOINT_CHANGE,
     ROBOT_PORT, CALIBRATION_FILE, ROBOT_TYPE, RETURN_TOLERANCE
 )
 from lerobot_kinematics import lerobot_IK, lerobot_FK, get_robot, feetech_arm
 from planner import compute_yaw_from_target
+
+
+def _resolve_robot_calibration_path(path_str: str) -> str:
+    """Resolve robot calibration file path (main_follower.json lives in examples/, not ball_tracking/)."""
+    p = Path(path_str)
+    if p.exists():
+        return str(p)
+    # When run from examples/ball_tracking/, config has "examples/main_follower.json" -> look in parent dir
+    script_dir = Path(__file__).resolve().parent
+    alt = script_dir.parent / Path(path_str).name  # examples/ball_tracking/../main_follower.json
+    if alt.exists():
+        return str(alt)
+    return path_str  # let feetech_arm report the error
 
 
 class RobotController:
@@ -19,7 +33,8 @@ class RobotController:
         self.arm = None
 
         if use_hardware:
-            self.arm = feetech_arm(driver_port=ROBOT_PORT, calibration_file=CALIBRATION_FILE)
+            calibration_path = _resolve_robot_calibration_path(CALIBRATION_FILE)
+            self.arm = feetech_arm(driver_port=ROBOT_PORT, calibration_file=calibration_path)
 
     def get_current_qpos(self):
         """Get current joint positions (from hardware feedback or internal state)."""
@@ -66,7 +81,7 @@ class RobotController:
             return self.current_qpos.copy(), False
 
         if not success or np.all(q_new == -1.0):
-            print(f"IK failed for target r={r:.3f}, z={z:.3f}")
+            print(f"IK failed for target x={x:.3f} y={y:.3f} z={z:.3f} -> r={r:.3f} z_clipped={z:.3f} (workspace r=[0.12,0.32], z~[0.08,0.25])")
             return self.current_qpos.copy(), False
 
         # Safety check: reject IK solutions too far from current position
