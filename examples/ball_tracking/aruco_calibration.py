@@ -37,6 +37,14 @@ from config import (
 )
 
 
+def _resolve_path(path: str) -> Path:
+    """Resolve path so it works when run from examples/ball_tracking or repo root."""
+    p = Path(path)
+    if p.exists():
+        return p
+    return Path(__file__).resolve().parent / Path(path).name
+
+
 class ArucoCalibrator:
     """Detects ArUco markers and computes camera-to-world transform."""
 
@@ -55,6 +63,12 @@ class ArucoCalibrator:
         # Initialize ArUco detector
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(dict_type)
         self.aruco_params = cv2.aruco.DetectorParameters()
+        # Relax params so printed markers (small in frame, lighting) are detected
+        # OpenCV requires both Min and Max >= 3
+        self.aruco_params.adaptiveThreshWinSizeMin = 3
+        self.aruco_params.adaptiveThreshWinSizeMax = 23
+        self.aruco_params.minMarkerPerimeterRate = 0.02   # allow smaller markers in frame
+        self.aruco_params.maxMarkerPerimeterRate = 4.0    # allow larger (closer) markers
         self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
 
         # Will be set from RealSense
@@ -90,22 +104,30 @@ class ArucoCalibrator:
         if ids is None or len(ids) == 0:
             return {}
 
-        # Estimate pose for each marker
+        # 3D marker corners in marker frame (center origin, Z out; same as old estimatePoseSingleMarkers)
+        s = self.marker_size
+        obj_points = np.array([
+            [-s / 2, s / 2, 0], [s / 2, s / 2, 0],
+            [s / 2, -s / 2, 0], [-s / 2, -s / 2, 0]
+        ], dtype=np.float32)
+
+        # Estimate pose with solvePnP (OpenCV 4.7+ removed estimatePoseSingleMarkers)
         results = {}
         for i, marker_id in enumerate(ids.flatten()):
-            # Get rotation and translation vectors
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
-                [corners[i]], self.marker_size, self.camera_matrix, self.dist_coeffs
+            success, rvec, tvec = cv2.solvePnP(
+                obj_points,
+                corners[i].astype(np.float32),
+                self.camera_matrix,
+                self.dist_coeffs,
+                flags=cv2.SOLVEPNP_IPPE_SQUARE,
             )
+            if not success:
+                continue
 
-            rvec = rvecs[0][0]
-            tvec = tvecs[0][0]
-
-            # Convert to 4x4 transform matrix
             R, _ = cv2.Rodrigues(rvec)
             T = np.eye(4)
             T[:3, :3] = R
-            T[:3, 3] = tvec
+            T[:3, 3] = tvec.flatten()
 
             results[marker_id] = T
 
@@ -230,9 +252,13 @@ def load_marker_positions(filepath: str) -> Dict[int, np.ndarray]:
     return marker_poses
 
 
-def save_calibration(T_camera_to_world: np.ndarray, filepath: str):
-    """Save calibration to JSON file."""
-    # Extract rotation as quaternion for compact storage
+def save_calibration(
+    T_camera_to_world: np.ndarray,
+    filepath: str,
+    samples_used: Optional[int] = None,
+    translation_std_mm: Optional[np.ndarray] = None,
+):
+    """Save calibration to JSON file (path from config: ARUCO_CALIBRATION_FILE_PATH)."""
     R = T_camera_to_world[:3, :3]
     t = T_camera_to_world[:3, 3]
     quat = Rotation.from_matrix(R).as_quat()  # [x, y, z, w]
@@ -243,6 +269,10 @@ def save_calibration(T_camera_to_world: np.ndarray, filepath: str):
         'translation_xyz': t.tolist(),
         'description': 'Transform from camera frame to world frame (robot base)',
     }
+    if samples_used is not None:
+        data['samples_used'] = samples_used
+    if translation_std_mm is not None:
+        data['translation_std_mm'] = translation_std_mm.tolist()
 
     with open(filepath, 'w') as f:
         json.dump(data, f, indent=2)
@@ -325,19 +355,26 @@ def generate_markers(output_dir: str = "aruco_markers", marker_ids: List[int] = 
 def preview_detection(camera: RealSenseCamera, calibrator: ArucoCalibrator):
     """Preview marker detection without calibrating."""
     print("\n=== ArUco Detection Preview ===")
-    print("Press 'q' to quit\n")
+    print("Press 'q' to quit")
+    print("If no markers are detected: check lighting, hold marker flat, try OpenCV-generated PNGs (--generate)\n")
 
     while True:
         color, depth = camera.get_frames()
         if color is None:
             continue
 
-        detections = calibrator.detect_markers(color)
+        # Get rejected candidates too (squares found but ID failed = possible pattern mismatch)
+        corners, ids, rejected = calibrator.detector.detectMarkers(color)
+        detections = calibrator.detect_markers(color) if (ids is not None and len(ids) > 0) else {}
         annotated = calibrator.draw_detections(color, detections)
+        # Draw rejected in pink so you can see if squares are found but not recognized
+        if rejected is not None and len(rejected) > 0:
+            cv2.aruco.drawDetectedMarkers(annotated, rejected, borderColor=(255, 0, 255))
 
         # Show detection count
+        num_rejected = len(rejected) if rejected is not None else 0
         cv2.putText(
-            annotated, f"Detected: {len(detections)} markers",
+            annotated, f"Detected: {len(detections)}  Rejected: {num_rejected}",
             (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2
         )
 
@@ -450,7 +487,13 @@ def run_calibration(
             final_transform[:3, :3] = avg_rotation
             final_transform[:3, 3] = avg_translation
 
-            save_calibration(final_transform, ARUCO_CALIBRATION_FILE_PATH)
+            std_mm = np.std(translations, axis=0) * 1000
+            save_calibration(
+                final_transform,
+                str(_resolve_path(ARUCO_CALIBRATION_FILE_PATH)),
+                samples_used=len(all_estimates),
+                translation_std_mm=std_mm,
+            )
 
             # Print summary
             print("\n" + "="*50)
@@ -503,8 +546,9 @@ def main():
             preview_detection(camera, calibrator)
         else:
             # Load marker positions
-            marker_poses = load_marker_positions(MARKER_POSITIONS_FILE)
-            print(f"Loaded {len(marker_poses)} marker positions from {MARKER_POSITIONS_FILE}")
+            marker_poses_file = _resolve_path(MARKER_POSITIONS_FILE)
+            marker_poses = load_marker_positions(str(marker_poses_file))
+            print(f"Loaded {len(marker_poses)} marker positions from {marker_poses_file}")
 
             run_calibration(camera, calibrator, marker_poses, args.samples)
     finally:

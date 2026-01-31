@@ -16,6 +16,7 @@ Two threads:
 
 import sys
 import os
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
@@ -25,14 +26,23 @@ import time
 from config import (
     CONTROL_RATE_HZ, DETECTION_FRAMES_THRESHOLD, BALL_LOST_TIMEOUT,
     CALIBRATION_FILE_PATH,
+    ARUCO_CALIBRATION_FILE_PATH,
 )
 from camera import RealSenseCamera
 from detector import BallDetector
 from predictor import BallPredictor
-from calibration import load_transform
+from calibration import load_transform, load_aruco_calibration
 from ball_to_robot import VisionToRobotPipeline
 from controller import RobotController
 from visualizer import Visualizer
+
+
+def _resolve_calibration_path(path_str: str) -> Path:
+    """Resolve calibration file path (try as-is, then next to this script)."""
+    p = Path(path_str)
+    if p.exists():
+        return p
+    return Path(__file__).resolve().parent / Path(path_str).name
 
 
 # Shared state (protected by lock)
@@ -144,14 +154,21 @@ def control_thread(shared, controller):
 def main():
     print("=== Ball Tracking & Interception (Real Robot) ===")
 
-    # Load calibration transform
-    if not os.path.exists(CALIBRATION_FILE_PATH):
-        print(f"ERROR: Calibration file not found: {CALIBRATION_FILE_PATH}")
-        print("Run calibrate_camera.py first.")
-        return
+    # Load camera → robot transform (prefer ArUco calibration if present)
+    aruco_path = _resolve_calibration_path(ARUCO_CALIBRATION_FILE_PATH)
+    legacy_path = _resolve_calibration_path(CALIBRATION_FILE_PATH)
 
-    cam_to_robot_T = load_transform(CALIBRATION_FILE_PATH)
-    print("Loaded camera-to-robot transform.")
+    if aruco_path.exists():
+        cam_to_robot_T = load_aruco_calibration(str(aruco_path))
+        print("Loaded camera-to-robot transform (ArUco calibration).")
+    elif legacy_path.exists():
+        cam_to_robot_T = load_transform(str(legacy_path))
+        print("Loaded camera-to-robot transform (legacy calibration).")
+    else:
+        print("ERROR: No calibration file found.")
+        print(f"  ArUco: {aruco_path} (run aruco_calibration.py)")
+        print(f"  Legacy: {legacy_path} (run calibrate_camera.py)")
+        return
 
     # Initialize components
     cam = RealSenseCamera()

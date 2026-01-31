@@ -11,18 +11,26 @@ Controls:
 
 import sys
 import os
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
 import time
 import cv2
 
-from config import CALIBRATION_FILE_PATH
+from config import CALIBRATION_FILE_PATH, ARUCO_CALIBRATION_FILE_PATH
 from camera import RealSenseCamera
 from detector import BallDetector
-from calibration import load_transform
+from calibration import load_transform, load_aruco_calibration
 from ball_to_robot import VisionToRobotPipeline
 from controller import RobotController
+
+
+def _resolve_calibration_path(path_str: str) -> Path:
+    p = Path(path_str)
+    if p.exists():
+        return p
+    return Path(__file__).resolve().parent / Path(path_str).name
 
 
 def main():
@@ -33,16 +41,19 @@ def main():
     print("  Q     - Quit")
     print()
 
-    # Load calibration
-    if not os.path.exists(CALIBRATION_FILE_PATH):
-        print(f"ERROR: No calibration file at {CALIBRATION_FILE_PATH}")
-        print("Run calibrate_camera.py first, or create a default transform.")
-        # Create identity transform for testing
+    # Load calibration (prefer ArUco if present)
+    aruco_path = _resolve_calibration_path(ARUCO_CALIBRATION_FILE_PATH)
+    legacy_path = _resolve_calibration_path(CALIBRATION_FILE_PATH)
+    if aruco_path.exists():
+        cam_to_robot_T = load_aruco_calibration(str(aruco_path))
+        print("Loaded calibration (ArUco).")
+    elif legacy_path.exists():
+        cam_to_robot_T = load_transform(str(legacy_path))
+        print("Loaded calibration (legacy).")
+    else:
+        print("ERROR: No calibration file found. Run aruco_calibration.py or calibrate_camera.py.")
         print("Using identity transform for testing...")
         cam_to_robot_T = np.eye(4)
-    else:
-        cam_to_robot_T = load_transform(CALIBRATION_FILE_PATH)
-        print("Loaded calibration.")
 
     # Initialize: pipeline = detect → transform to robot → target (we use .ball_pos_robot for SPACE)
     cam = RealSenseCamera()

@@ -80,7 +80,7 @@ def save_transform(T, filepath):
 
 
 def load_transform(filepath, validate=True):
-    """Load 4x4 transform matrix from JSON file.
+    """Load 4x4 transform matrix from JSON file (legacy format: transform_4x4).
 
     Args:
         filepath: input JSON file path
@@ -97,6 +97,30 @@ def load_transform(filepath, validate=True):
         det_r = np.linalg.det(T[:3, :3])
         if abs(det_r - 1.0) > 0.01:
             print(f"[calibration] WARNING: loaded T has det(R)={det_r:.4f} (expected 1.0); recompute with calibrate_camera.py")
+    return T
+
+
+def load_aruco_calibration(filepath, validate=True):
+    """Load camera-to-world (robot base) transform from ArUco calibration JSON.
+
+    Use this when you calibrated with aruco_calibration.py (four markers on table).
+    World frame = robot base frame, so T_camera_to_world is camera → robot.
+
+    Args:
+        filepath: path to camera_to_world.json
+        validate: if True, warn when det(R) is not ~1
+
+    Returns:
+        np.ndarray: 4x4 T (camera → robot/world)
+    """
+    with open(filepath, 'r') as f:
+        data = json.load(f)
+    T = np.array(data["T_camera_to_world"])
+    assert T.shape == (4, 4)
+    if validate:
+        det_r = np.linalg.det(T[:3, :3])
+        if abs(det_r - 1.0) > 0.01:
+            print(f"[calibration] WARNING: ArUco T has det(R)={det_r:.4f} (expected 1.0)")
     return T
 
 

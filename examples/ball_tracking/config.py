@@ -61,10 +61,14 @@ NUM_CALIBRATION_POINTS = 8
 MARKER_OFFSET_IN_ROBOT_FRAME = np.array([0.0, 0.0, 0.0])
 
 # --- ArUco Calibration (for camera behind robot, not seeing EE) ---
-ARUCO_MARKER_SIZE = 0.201  # meters (201mm = 20.1cm, measured from printed marker)
+# Physical marker side in meters.
+ARUCO_MARKER_SIZE = 0.20   # 20 cm
 ARUCO_DICT_TYPE = 0  # cv2.aruco.DICT_4X4_50 = 0
 MARKER_POSITIONS_FILE = "examples/ball_tracking/marker_positions.yaml"
 ARUCO_CALIBRATION_FILE_PATH = "examples/ball_tracking/camera_to_world.json"
+# Last ArUco calibration summary (world frame; update after re-running aruco_calibration.py)
+ARUCO_CALIBRATION_CAMERA_POSITION_XYZ = np.array([0.1711, -0.1058, 1.1479])  # m (X, Y, Z)
+ARUCO_CALIBRATION_TRANSLATION_STD_MM = np.array([1367.5, 331.0, 8.77])      # mm (for reference)
 
 # --- MuJoCo Simulation ---
 SIM_XML_PATH = "./examples/ball_tracking/scene_ball.xml"
